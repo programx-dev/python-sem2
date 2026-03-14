@@ -1,4 +1,4 @@
-from typing import Callable, Type
+from typing import Callable
 
 from src.contracts.task_source import TaskSource
 
@@ -9,11 +9,12 @@ REGISTRY: dict[str, SourceFactory] = {}
 
 def register_source(name: str):
     """
-    Декоратор для регистрации ресурса.
+    Декоратор для регистрации фабрики источника.
     """
 
-    def _decorator(class_or_function: Type | Callable):
-        REGISTRY[name] = class_or_function
-        return class_or_function
+    def _decorator(factory: SourceFactory):
+        REGISTRY[name] = factory
+
+        return factory
 
     return _decorator

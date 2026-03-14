@@ -1,25 +1,31 @@
-from collections.abc import Sequence, Iterable
+from collections.abc import Iterable, Sequence
 
 from src.contracts.task import Task
 from src.contracts.task_source import TaskSource
 
 
-class InboxApp:
+class InboxTasks:
     """
-    Класс управления потоком задач.
+    Компонент для сбора задач из множества источников.
     """
 
-    def __init__(self, sources: Sequence[TaskSource] | None = None):
-        self._sources = sources or []
-
-    def iter_tasks(self) -> Iterable[Task]:
+    def __init__(self, sources: Sequence[TaskSource]):
         """
-        Получает поток задач из зарегистрированных источников и
-        возвращает их по одному.
+        Выполняет обязательную runtime-проверку контракта.
         """
-        for src in self._sources:
-            if not isinstance(src, TaskSource):
-                raise TypeError("Ресурс обязан удовлетворять протоколу TaskSource.")
+        self._sources = []
 
-            for task in src.get_tasks():
-                yield task
+        for source in sources:
+            if not isinstance(source, TaskSource):
+                raise TypeError(
+                    f"Объект {type(source).__name__} не соблюдает контракт TaskSource"
+                )
+
+            self._sources.append(source)
+
+    def fetch_all(self) -> Iterable[Task]:
+        """
+        Итерируется по всем источникам и собирает задачи.
+        """
+        for source in self._sources:
+            yield from source.get_tasks()

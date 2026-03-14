@@ -7,9 +7,11 @@ from src.contracts.task import Task
 @runtime_checkable
 class TaskSource(Protocol):
     """
-    Протокол для объекта-задачи.
+    Единый поведенческий контракт для всех источников задач.
     """
 
-    name: str
-
-    def get_tasks(self) -> Iterable[Task]: ...
+    def get_tasks(self) -> Iterable[Task]:
+        """
+        Возвращает поток задач из источника.
+        """
+        ...

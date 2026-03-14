@@ -1,51 +1,58 @@
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from src.contracts.task import Task
 from src.sources.repository import register_source
 
 
-def parse_jsonl_file(line: str, path: str, line_no: int) -> dict[str, Any]:
-    """
-    Распарсить jsonl файл.
-    """
-    try:
-        return json.loads(line)
-    except json.JSONDecodeError as error:
-        raise ValueError(f"Невалидный JSON в {path}:{line_no}: {error}") from error
-
-
-@dataclass(frozen=True)
 class JsonlSource:
-    """
-    Генератор задач из JSONl.
-    """
+    """Читает задачи из файла формата JSON Lines."""
 
-    path: Path
-    name: str = "file-jsonl"
+    def __init__(self, path: Path | str):
+        # Приводим к Path, даже если пришла строка
+        self.path = Path(path)
+
+    def _parse_line(self, line: str, line_no: int) -> Task:
+        """Внутренний метод для разбора одной строки JSON."""
+        try:
+            data = json.loads(line)
+            if "id" not in data or "content" not in data:
+                raise KeyError("отсутствуют обязательные поля 'id' или 'content'")
+
+            return Task(id=str(data["id"]), payload=data["content"])
+
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Ошибка синтаксиса JSON ({self.path.name}:{line_no})"
+            ) from e
+        except KeyError as e:
+            raise ValueError(
+                f"Ошибка структуры данных ({self.path.name}:{line_no})"
+            ) from e
 
     def get_tasks(self) -> Iterable[Task]:
-        """
-        генерирует объекты-задачи из файла JSONL.
-        Возвращает по одному.
-        """
-        with self.path.open("r", encoding="utf-8") as file:
-            for line_no, line in enumerate(file, start=1):
-                line = line.strip()
+        if not self.path.exists():
+            raise FileNotFoundError(f"Файл не найден: {self.path}")
 
-                if not line:
-                    continue
+        if not self.path.is_file():
+            raise IsADirectoryError(f"Ожидался файл, но это директория: {self.path}")
 
-                task = parse_jsonl_file(line, str(self.path), line_no)
-                task_id = str(task.get("id", f"{self.path.name}:{line_no}"))
-                task_content = task.get("content", "")
+        try:
+            with self.path.open(encoding="utf-8") as f:
+                for line_no, line in enumerate(f, 1):
+                    clean_line = line.strip()
+                    if not clean_line:
+                        continue
 
-                yield Task(id=task_id, payload=task_content)
+                    yield self._parse_line(clean_line, line_no)
+
+        except PermissionError:
+            raise PermissionError(f"Нет прав на чтение файла: {self.path}")
+        except OSError as e:
+            raise RuntimeError(f"Системная ошибка при чтении {self.path.name}") from e
 
 
-@register_source("file-jsonl")
-def create_json_source(path: Path) -> JsonlSource:
-    return JsonlSource(path=path)
+@register_source("jsonl")
+def create_jsonl(path: Path) -> JsonlSource:
+    return JsonlSource(path)

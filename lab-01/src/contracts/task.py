@@ -5,7 +5,7 @@ from typing import Any
 @dataclass(frozen=True, slots=True)
 class Task:
     """
-    Объект-задача.
+    Представление единицы работы в системе.
     """
 
     id: str

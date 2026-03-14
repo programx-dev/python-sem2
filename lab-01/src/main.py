@@ -1,71 +1,86 @@
 from pathlib import Path
-from typing import Any
-import typer
-from typer import Typer
+from typing import List
 
-from src.inbox.core import InboxApp
+import typer
+
+import src.sources  # noqa Инициализация реестра источников
+from src.contracts.task_source import TaskSource
+from src.inbox.core import InboxTasks
 from src.sources.repository import REGISTRY
 
-cli = Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True)
 
 
-@cli.command("plugins")
-def plugins_list() -> None:
-    typer.echo("Доступные расширения:")
-    for name in sorted(REGISTRY):
-        typer.echo(name)
+def build_active_sources(
+    jsonl_files: List[Path], gen_count: int, use_api: bool, api_min: int, api_max: int
+) -> List[TaskSource]:
+    """Сборка списка источников на основе аргументов CLI."""
+    active = []
 
-
-def _build_sources(
-    stdin: bool, jsonl: list[Path], gen_count: int, use_api: bool
-) -> list[Any]:
-    """
-    Создать список генераторов задач, из существующих фабрик.
-    """
-    sources: list[Any] = []
-
-    if stdin:
-        sources.append(REGISTRY["stdin"]())
-    if use_api:
-        sources.append(REGISTRY["api-stub"]())
     if gen_count > 0:
-        sources.append(REGISTRY["generator"](count=gen_count))
-    for path in jsonl:
-        sources.append(REGISTRY["file-jsonl"](path))
+        active.append(REGISTRY["generator"](count=gen_count))
 
-    return sources
+    for path in jsonl_files:
+        active.append(REGISTRY["jsonl"](path=path))
+
+    if use_api:
+        active.append(REGISTRY["api-stub"](min_tasks=api_min, max_tasks=api_max))
+
+    return active
 
 
-@cli.command("read")
+@app.command()
 def read(
-    stdin: bool = typer.Option(False, "--stdin", help="Читать из потока ввода"),
-    jsonl: list[Path] = typer.Option(
-        default_factory=list, exists=True, help="Читать из JSONL файлов"
-    ),
-    gen: int = typer.Option(0, "--gen", help="Программно сгенерировать N задач"),
-    api: bool = typer.Option(
-        False, "--api", help="Использовать генератор API заглушку"
-    ),
-    contains: str | None = typer.Option(
-        None, "--contains", help="Фильтрация по подстроке (нечуствителен к регистру)"
-    ),
+    jsonl: List[Path] = typer.Option([], "--jsonl", help="Пути к JSONL файлам."),
+    gen: int = typer.Option(0, "--gen", help="Количество генерируемых задач."),
+    api: bool = typer.Option(False, "--api", help="Включить API заглушку."),
+    api_min: int = typer.Option(1, "--api-min", help="Минимум задач для API."),
+    api_max: int = typer.Option(12, "--api-max", help="Максимум задач для API."),
 ):
-    raw_sources = _build_sources(stdin, jsonl, gen, api)
-    inbox = InboxApp(raw_sources)
+    """Чтение и вывод задач из выбранных источников."""
+
+    sources_list = build_active_sources(jsonl, gen, api, api_min, api_max)
+
+    if not sources_list:
+        typer.secho(
+            "(!) Источники не выбраны. Используйте флаги --gen, --jsonl или --api.",
+            fg="yellow",
+        )
+        raise typer.Exit()
+
+    inbox = InboxTasks(sources_list)
+
+    typer.secho("\n--- Обработка входящих задач ---", fg="cyan")
+
     count = 0
+    try:
+        for task in inbox.fetch_all():
+            task_id_style = typer.style(task.id, fg="green", bold=True)
+            typer.echo(f"ID: {task_id_style:<15} | {task.payload}")
+            count += 1
 
-    for task in inbox.iter_tasks():
-        if contains and contains.lower() not in str(task.payload).lower():
-            continue
+    except Exception as e:
+        typer.secho(f"\nОшибка: {e}", fg="red")
+        raise typer.Exit(code=1)
 
-        count += 1
-        typer.echo(f"ID: {task.id:<10} | Полезные данные: {task.payload}")
+    typer.echo(f"\nВыполнено. Всего задач: {count}\n")
 
-    typer.echo(f"\nОбработанных задач: {count}")
+
+@app.command()
+def sources():
+    """Список всех доступных типов источников."""
+    if not REGISTRY:
+        typer.echo("Реестр источников пуст.")
+        return
+
+    typer.echo("\nДоступные плагины:")
+    for i, name in enumerate(sorted(REGISTRY.keys()), 1):
+        typer.echo(f" {i}. {typer.style(name, fg='yellow')}")
+    typer.echo("")
 
 
 def main():
-    cli()
+    app()
 
 
 if __name__ == "__main__":
