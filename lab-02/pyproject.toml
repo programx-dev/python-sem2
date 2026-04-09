@@ -1,0 +1,31 @@
+[project]
+name = "lab-02"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.24.1",
+]
+
+# Создаем команду для быстрого запуска
+[project.scripts]
+lab2 = "src.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.5",
+]
+
+# Главное тут
+[tool.uv]
+package = true  # Говорим uv установить наш код в виртуальное окружение
+
+[tool.setuptools]
+packages = ["src"] # Явно указываем, что наш код лежит в папке src
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
