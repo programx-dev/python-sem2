@@ -1,0 +1,4 @@
+{"task_id": "task-001", "description": "Подготовить отчет по первой лабораторной", "priority": 5, "status": "new", "deadline": "20.12.2025 18:00:00", "created_at": "01.12.2024 10:00:00"}
+{"task_id": "task-002", "description": "Написать тесты для TaskSource", "priority": 10, "status": "in_progress", "deadline": "15.01.2025 12:00:00", "created_at": "05.12.2024 11:00:00"}
+{"task_id": "task-003", "description": "Проверить работу генератора задач", "priority": 3, "status": "done", "deadline": "10.12.2024 20:00:00", "created_at": "01.11.2024 09:00:00"}
+{"task_id": "task-004", "description": "Проверь чтение из JSONL файла", "priority": 1, "status": "new", "deadline": "30.06.2025 00:00:00", "created_at": "10.12.2024 15:45:00"}
